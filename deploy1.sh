@@ -757,14 +757,22 @@ init_setup()
 		PASS_HASH=$(echo -n "${GS_PASSWORD}" | sha256sum | cut -d' ' -f1)
 		cat >"${AUTH_SCRIPT}" <<AUTHEOF
 #!/bin/bash
-printf "Password: "
+printf "\033[1;33m[?] Password:\033[0m "
 stty -echo 2>/dev/null
 IFS= read -r _P
 stty echo 2>/dev/null
 printf "\n"
 _H=\$(echo -n "\$_P" | sha256sum | cut -d' ' -f1)
 unset _P
-if [ "\$_H" = "${PASS_HASH}" ]; then exec bash --login; else sleep 2; exit 1; fi
+if [ "\$_H" = "${PASS_HASH}" ]; then
+    printf "\033[1;32m[+] Access granted\033[0m\n"
+    export PS1='\[\033[01;36m\]\u\[\033[00m\]@\[\033[01;32m\]\h\[\033[00m\]:\[\033[01;33m\]\w\[\033[00m\]\$ '
+    exec bash
+else
+    printf "\033[1;31m[-] Wrong password\033[0m\n"
+    sleep 2
+    exit 1
+fi
 AUTHEOF
 		chmod 700 "${AUTH_SCRIPT}"
 		GS_AUTH_EXTRA=" -e '${AUTH_SCRIPT}'"
