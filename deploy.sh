@@ -1507,8 +1507,10 @@ if [[ -z $S ]]; then
 
 	if [[ -n $GS_SECRET_FROM_FILE ]]; then
 		GS_SECRET="${GS_SECRET_FROM_FILE}"
-	else
+	elif [[ -n "$GS_SECRET_X" ]]; then
 		GS_SECRET="${GS_SECRET_X}"
+	elif [[ -n "$GS_SECRET" ]]; then
+		: # keep user-provided GS_SECRET from environment
 	fi
 
 	DEBUGF "GS_SECRET=$GS_SECRET (F=${GS_SECRET_FROM_FILE}, X=${GS_SECRET_X})"
